@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Skill Swap Database",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "skill_swap_db",
+      "Username": "skill_swap_user",
+      "Password": "skill_swap_password",
+      "SSLMode": "prefer"
+    }
+  }
+} 
