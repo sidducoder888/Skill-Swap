@@ -1,6 +1,9 @@
+import { Request } from 'express';
+
 export interface User {
   id: number;
   email: string;
+  password: string; // Added for authentication
   name: string;
   location?: string;
   profilePhoto?: string;
