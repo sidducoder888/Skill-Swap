@@ -56,13 +56,13 @@ class ApiService {
     });
   }
 
-  async logout() {
+  async logout(): Promise<{ success: boolean; data?: any; message?: string }> {
     return this.request('/auth/logout', {
       method: 'POST',
     });
   }
 
-  async refreshToken() {
+  async refreshToken(): Promise<{ success: boolean; data: { token: string }; message?: string }> {
     return this.request('/auth/refresh', {
       method: 'POST',
     });
@@ -73,7 +73,7 @@ class ApiService {
     return this.request('/users/profile');
   }
 
-  async updateProfile(userData: any) {
+  async updateProfile(userData: any): Promise<{ success: boolean; data: any; message?: string }> {
     return this.request('/users/profile', {
       method: 'PUT',
       body: JSON.stringify(userData),
@@ -149,16 +149,16 @@ class ApiService {
       body: JSON.stringify({ role }),
     });
   }
+
+  // Auth token management
+  setAuthToken(token: string) {
+    localStorage.setItem('token', token);
+  }
+
+  removeAuthToken() {
+    localStorage.removeItem('token');
+  }
 }
 
 export const apiService = new ApiService();
 export const api = apiService; // For backward compatibility
-
-// Add missing methods to the instance
-(apiService as any).setAuthToken = (token: string) => {
-  localStorage.setItem('token', token);
-};
-
-(apiService as any).removeAuthToken = () => {
-  localStorage.removeItem('token');
-};
