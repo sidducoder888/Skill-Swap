@@ -1,12 +1,19 @@
 {
-  "name": "backend",
+  "name": "skill-swap-platform",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A platform for users to swap skills with each other",
+  "main": "server/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
-}
+  "keywords": ["skill-swap", "platform", "react", "nodejs"],
+  "author": "Skill Swap Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 
