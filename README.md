@@ -1,11 +1,13 @@
 # Skill-Swap
 
-## Teammates
+## 👥 Team Members & Roles
 
-Repala Sandeep       - sandeeprepala3@gmail.com  
-Kolli Varshith       - kollivarshith123@gmail.com  
-Sai Siddeswar        - siddeswar0605@gmail.com  
-Srikrishna           - srikrishnanutalapati@gmail.com
+| Name               | Email                          | Role                                  |
+|--------------------|--------------------------------|---------------------------------------|
+| **Repala Sandeep** | sandeeprepala3@gmail.com       | Frontend Development                  |
+| **Kolli Varshith** | kollivarshith123@gmail.com     | Frontend Development                  |
+| **Sai Siddeswar**  | siddeswar0605@gmail.com        | Idea Refinement & Backend Validations |
+| **Srikrishna**     | srikrishnanutalapati@gmail.com | Backend Architecture & API Creation   |
 
 ## 🧩 Problem Statement – Skill Swap Platform
 
