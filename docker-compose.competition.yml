@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # Redis for caching and performance
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - skillswap-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Main application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - JWT_SECRET=${JWT_SECRET:-competition-secret-key-2024}
+      - CLIENT_URL=http://localhost:5000
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_PATH=/app/data/skillswap.db
+      - LOG_LEVEL=info
+    volumes:
+      - app_data:/app/data
+      - app_uploads:/app/uploads
+      - app_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - skillswap-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/api/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development server (for development mode)
+  dev-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5001:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - JWT_SECRET=dev-secret-key-2024
+      - CLIENT_URL=http://localhost:3000
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_PATH=/app/data/skillswap.db
+      - LOG_LEVEL=debug
+    volumes:
+      - ./server:/app:delegated
+      - /app/node_modules
+      - dev_server_data:/app/data
+      - dev_server_uploads:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: npm run dev
+    networks:
+      - skillswap-network
+    profiles:
+      - development
+
+  # Development client (for development mode)
+  dev-client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=http://localhost:5001
+      - GENERATE_SOURCEMAP=false
+    volumes:
+      - ./client:/app:delegated
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    command: npm start
+    networks:
+      - skillswap-network
+    profiles:
+      - development
+
+volumes:
+  redis_data:
+    driver: local
+  app_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_logs:
+    driver: local
+  dev_server_data:
+    driver: local
+  dev_server_uploads:
+    driver: local
+
+networks:
+  skillswap-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
