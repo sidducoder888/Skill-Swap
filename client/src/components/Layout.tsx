@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemText, Box } from '@mui/material';
+import { AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemText, ListItemButton, Box } from '@mui/material';
 
 const navItems = [
   { label: 'Dashboard', path: '/dashboard' },
@@ -24,8 +24,10 @@ export const Layout = () => (
       <Toolbar />
       <List>
         {navItems.map((item) => (
-          <ListItem button key={item.path} component={Link} to={item.path}>
-            <ListItemText primary={item.label} />
+          <ListItem key={item.path} disablePadding>
+            <ListItemButton component={Link} to={item.path}>
+              <ListItemText primary={item.label} />
+            </ListItemButton>
           </ListItem>
         ))}
       </List>

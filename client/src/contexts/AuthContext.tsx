@@ -185,7 +185,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<void> => {
     try {
       setIsLoading(true);
-      const response = await apiService.login(email, password);
+      const response = await apiService.login({ email, password });
       
       if (response.success) {
         const { token: newToken, user: userData } = response.data;
