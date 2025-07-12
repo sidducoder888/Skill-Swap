@@ -17,7 +17,6 @@ class ApiService {
       ...options,
     };
 
-    // Add auth token if available
     const token = localStorage.getItem('token');
     if (token) {
       config.headers = {
@@ -42,120 +41,159 @@ class ApiService {
   }
 
   // Auth endpoints
-  async login(credentials: { email: string; password: string }): Promise<{ success: boolean; data: { token: string; user: any }; message?: string }> {
-    const response = await this.request<{ success: boolean; data: { token: string; user: any }; message?: string }>('/auth/login-test', {
+  async login(credentials: { email: string; password: string }): Promise<any> {
+    return this.request('/auth/login-test', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    return response;
   }
 
-  async register(userData: { email: string; password: string; firstName: string; lastName: string }): Promise<{ success: boolean; data: { token: string; user: any }; message?: string }> {
-    // Convert firstName/lastName to name for server compatibility
-    const serverData = {
-      ...userData,
-      name: `${userData.firstName} ${userData.lastName}`.trim(),
-    };
-
-    const response = await this.request<{ success: boolean; data: { token: string; user: any }; message?: string }>('/auth/register-test', {
+  async register(userData: any): Promise<any> {
+    return this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify(serverData),
+      body: JSON.stringify(userData),
     });
-    return response;
   }
 
-  async logout(): Promise<{ success: boolean; data?: any; message?: string }> {
+  async logout(): Promise<any> {
     return this.request('/auth/logout', {
       method: 'POST',
     });
   }
 
-  async refreshToken(): Promise<{ success: boolean; data: { token: string }; message?: string }> {
+  async refreshToken(): Promise<any> {
     return this.request('/auth/refresh', {
       method: 'POST',
     });
   }
 
-  // User endpoints
-  async getProfile(): Promise<{ success: boolean; data: any; message?: string }> {
-    return this.request('/users/profile');
+  async getProfile(): Promise<any> {
+    return this.request('/auth/me');
   }
 
-  async updateProfile(userData: any): Promise<{ success: boolean; data: any; message?: string }> {
-    return this.request('/users/profile', {
+  async updateProfile(userData: any): Promise<any> {
+    return this.request('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(userData),
     });
   }
 
-  async getUserProfile(userId: string) {
-    return this.request(`/users/${userId}`);
-  }
-
   // Skills endpoints
-  async getSkills() {
-    return this.request('/skills');
+  async getMySkills(): Promise<any> {
+    return this.request('/skills/me');
   }
 
-  async createSkill(skillData: any) {
+  async createSkill(skillData: any): Promise<any> {
     return this.request('/skills', {
       method: 'POST',
       body: JSON.stringify(skillData),
     });
   }
 
-  async updateSkill(skillId: string, skillData: any) {
-    return this.request(`/skills/${skillId}`, {
+  async updateSkill(id: number, skillData: any): Promise<any> {
+    return this.request(`/skills/${id}`, {
       method: 'PUT',
       body: JSON.stringify(skillData),
     });
   }
 
-  async deleteSkill(skillId: string) {
-    return this.request(`/skills/${skillId}`, {
+  async deleteSkill(id: number): Promise<any> {
+    return this.request(`/skills/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Swaps endpoints
-  async getSwaps() {
-    return this.request('/swaps');
+  async getMySwaps(): Promise<any> {
+    return this.request('/swaps/me');
   }
 
-  async createSwap(swapData: any) {
+  async getSwap(id: number): Promise<any> {
+    return this.request(`/swaps/${id}`);
+  }
+
+  async createSwap(swapData: any): Promise<any> {
     return this.request('/swaps', {
       method: 'POST',
       body: JSON.stringify(swapData),
     });
   }
 
-  async updateSwap(swapId: string, swapData: any) {
-    return this.request(`/swaps/${swapId}`, {
+  async updateSwapStatus(id: number, status: string): Promise<any> {
+    return this.request(`/swaps/${id}/status`, {
       method: 'PUT',
-      body: JSON.stringify(swapData),
+      body: JSON.stringify({ status }),
     });
   }
 
-  async deleteSwap(swapId: string) {
-    return this.request(`/swaps/${swapId}`, {
+  async deleteSwap(id: number): Promise<any> {
+    return this.request(`/swaps/${id}`, {
       method: 'DELETE',
     });
   }
 
+  async rateSwap(id: number, rating: number, comment?: string): Promise<any> {
+    return this.request(`/swaps/${id}/rate`, {
+      method: 'POST',
+      body: JSON.stringify({ rating, comment }),
+    });
+  }
+
+  // Users endpoints
+  async getUsers(): Promise<any> {
+    return this.request('/users');
+  }
+
+  async getUser(id: number): Promise<any> {
+    return this.request(`/users/${id}`);
+  }
+
+  // Mock data endpoints (for development)
+  async getMockData(): Promise<any> {
+    return this.request('/mock/data');
+  }
+
+  // Notifications endpoints
+  async getNotifications(): Promise<any> {
+    return this.request('/notifications');
+  }
+
+  async markNotificationAsRead(id: number): Promise<any> {
+    return this.request(`/notifications/${id}/read`, {
+      method: 'PUT',
+    });
+  }
+
+  async markAllNotificationsAsRead(): Promise<any> {
+    return this.request('/notifications/read-all', {
+      method: 'PUT',
+    });
+  }
+
   // Admin endpoints
-  async getAdminStats() {
+  async getAdminStats(): Promise<any> {
     return this.request('/admin/stats');
   }
 
-  async getAdminUsers() {
+  async getAdminUsers(): Promise<any> {
     return this.request('/admin/users');
   }
 
-  async updateUserRole(userId: string, role: string) {
-    return this.request(`/admin/users/${userId}/role`, {
+  async banUser(id: number, banned: boolean): Promise<any> {
+    return this.request(`/admin/users/${id}/ban`, {
       method: 'PUT',
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ banned }),
     });
+  }
+
+  // Dashboard endpoint
+  async getDashboard(): Promise<any> {
+    return this.request('/dashboard');
+  }
+
+  // Health check
+  async healthCheck(): Promise<any> {
+    return this.request('/health');
   }
 
   // Auth token management
@@ -169,4 +207,3 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
-export const api = apiService; // For backward compatibility

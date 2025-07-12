@@ -81,7 +81,7 @@ export class WebSocketService {
 
     this.setupMiddleware();
     this.setupEventHandlers();
-    
+
     loggers.system.startup('WebSocket Server', undefined);
   }
 
@@ -90,14 +90,15 @@ export class WebSocketService {
     this.io.use(async (socket: AuthenticatedSocket, next) => {
       try {
         const token = socket.handshake.auth.token || socket.handshake.query.token;
-        
+
         if (!token) {
           return next(new Error('Authentication token required'));
         }
 
         // Verify JWT token
-        const decoded = jwt.verify(token as string, process.env.JWT_SECRET!) as any;
-        
+        const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_for_development';
+        const decoded = jwt.verify(token as string, jwtSecret) as any;
+
         if (!decoded || !decoded.userId) {
           return next(new Error('Invalid token'));
         }
@@ -128,7 +129,7 @@ export class WebSocketService {
       // Simple rate limiting using Redis
       redisService.get(`rate_limit:${userId}`).then(count => {
         const requestCount = parseInt(count || '0');
-        
+
         if (requestCount >= maxRequests) {
           loggers.security.rateLimit(socket.handshake.address, 'websocket');
           return next(new Error('Rate limit exceeded'));
@@ -166,7 +167,7 @@ export class WebSocketService {
     };
 
     this.connectedUsers.set(userId, socketUser);
-    
+
     // Handle multiple sockets per user
     if (!this.userSockets.has(userId)) {
       this.userSockets.set(userId, []);
@@ -198,7 +199,7 @@ export class WebSocketService {
   private handleDisconnection(socket: AuthenticatedSocket): void {
     socket.on('disconnect', (reason: string) => {
       const userId = socket.userId!;
-      
+
       if (userId) {
         // Remove socket from user's socket list
         const userSockets = this.userSockets.get(userId);
@@ -207,7 +208,7 @@ export class WebSocketService {
           if (index > -1) {
             userSockets.splice(index, 1);
           }
-          
+
           // If no more sockets, user is offline
           if (userSockets.length === 0) {
             this.connectedUsers.delete(userId);
@@ -242,10 +243,10 @@ export class WebSocketService {
     // User presence updates
     socket.on('presence:update', (data: { status: 'online' | 'away' | 'busy' }) => {
       const userId = socket.userId!;
-      
+
       // Update user status in cache
       redisService.hashSet(`user:${userId}:presence`, 'status', data.status);
-      
+
       // Broadcast to relevant users (friends, active swaps)
       this.broadcastToUserContacts(userId, 'presence:update', {
         userId,
@@ -328,7 +329,7 @@ export class WebSocketService {
 
     socket.on('swap:cancel', (data: SwapUpdatePayload) => {
       const otherUserId = data.fromUser.id === socket.userId ? data.toUser.id : data.fromUser.id;
-      
+
       this.notifyUser(otherUserId, 'swap_cancelled', {
         type: 'system_message',
         title: 'Skill Swap Cancelled',
@@ -351,7 +352,7 @@ export class WebSocketService {
 
       // Send to recipient
       this.io.to(`user:${data.toUserId}`).emit('message:receive', message);
-      
+
       // Confirm to sender
       socket.emit('message:sent', { tempId: message.id, message });
 
@@ -465,7 +466,7 @@ export class WebSocketService {
     try {
       // Get user's contacts from cache or database
       const contacts = await this.getUserContacts(userId);
-      
+
       contacts.forEach(contactId => {
         this.io.to(`user:${contactId}`).emit(event, data);
       });
@@ -494,12 +495,12 @@ export class WebSocketService {
   private async sendPendingNotifications(userId: number): Promise<void> {
     try {
       const notifications = await redisService.getObject<NotificationPayload[]>(`user:${userId}:pending_notifications`);
-      
+
       if (notifications && notifications.length > 0) {
         notifications.forEach(notification => {
           this.io.to(`user:${userId}`).emit('notification:pending', notification);
         });
-        
+
         // Clear pending notifications
         await redisService.del(`user:${userId}:pending_notifications`);
       }
@@ -512,14 +513,14 @@ export class WebSocketService {
     try {
       const key = `user:${userId}:pending_notifications`;
       const notifications = await redisService.getObject<NotificationPayload[]>(key) || [];
-      
+
       notifications.push(data);
-      
+
       // Keep only last 50 notifications
       if (notifications.length > 50) {
         notifications.splice(0, notifications.length - 50);
       }
-      
+
       await redisService.setObject(key, notifications, 86400); // 24 hours TTL
     } catch (error) {
       loggers.websocket.error(userId, error as Error);

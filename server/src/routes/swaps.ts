@@ -1,3 +1,4 @@
+import { getWebSocketService } from '../services/websocket';
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { db } from '../database/init';
@@ -73,12 +74,50 @@ router.post('/', authenticateToken, [
                     return res.status(500).json({ error: 'Failed to create swap request' });
                 }
 
+                // WebSocket notification temporarily disabled
+                // const wsService = getWebSocketService();
+                // const notification = {
+                //     type: 'swap_request' as const,
+                //     title: 'New Swap Request',
+                //     message: `You have a new swap request from ${req.user?.name}.`,
+                //     data: { swapId: this.lastID },
+                // };
+                // wsService.notifyUser(toUserId, notification);
+
                 res.status(201).json({
                     message: 'Swap request created successfully',
                     swapId: this.lastID
                 });
             });
         });
+    });
+});
+
+// Get user's swap requests
+router.get('/me', authenticateToken, (req: AuthRequest, res: Response) => {
+    if (!req.user) {
+        return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    db.all(`
+    SELECT sr.*,
+           u1.name as fromUserName, u1.profilePhoto as fromUserPhoto,
+           u2.name as toUserName, u2.profilePhoto as toUserPhoto,
+           s1.name as offeredSkillName,
+           s2.name as wantedSkillName
+    FROM swap_requests sr
+    JOIN users u1 ON sr.fromUserId = u1.id
+    JOIN users u2 ON sr.toUserId = u2.id
+    JOIN skills s1 ON sr.offeredSkillId = s1.id
+    JOIN skills s2 ON sr.wantedSkillId = s2.id
+    WHERE sr.fromUserId = ? OR sr.toUserId = ?
+    ORDER BY sr.createdAt DESC
+  `, [req.user.id, req.user.id], (err, swaps) => {
+        if (err) {
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        res.json({ swaps });
     });
 });
 
@@ -163,10 +202,27 @@ router.put('/:id/status', authenticateToken, [
       UPDATE swap_requests 
       SET status = ?, updatedAt = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `, [status, swapId], function (err) {
+    `, [status, swapId], (err) => {
             if (err) {
                 return res.status(500).json({ error: 'Failed to update swap request' });
             }
+
+            // WebSocket notifications temporarily disabled
+            // const wsService = getWebSocketService();
+            // const notification = {
+            //     type: status === 'accepted' ? 'swap_accepted' as const :
+            //         status === 'rejected' ? 'swap_rejected' as const :
+            //             'swap_completed' as const,
+            //     title: `Swap request ${status}`,
+            //     message: `Your swap request has been ${status}.`,
+            //     data: { swapId },
+            // };
+
+            // if (status === 'accepted' || status === 'rejected') {
+            //     wsService.notifyUser((swap as any).fromUserId, notification);
+            // } else if (status === 'cancelled') {
+            //     wsService.notifyUser((swap as any).toUserId, notification);
+            // }
 
             res.json({ message: `Swap request ${status} successfully` });
         });

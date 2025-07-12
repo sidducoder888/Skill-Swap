@@ -13,19 +13,21 @@ import { redisService } from './services/redis';
 import { initializeWebSocket } from './services/websocket';
 import { createTables } from './database/schema';
 import { authRoutes } from './routes/auth';
-import { userRoutes } from './routes/users';
+import userRoutes from './routes/users';
 import { skillRoutes } from './routes/skills';
 import { swapRoutes } from './routes/swaps';
 import { adminRoutes } from './routes/admin';
 import { notificationRoutes } from './routes/notifications';
 import { messageRoutes } from './routes/messages';
 import { analyticsRoutes } from './routes/analytics';
+import { dashboardRoutes } from './routes/dashboard';
 import { AuthRequest } from './types';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 const server = createServer(app);
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
@@ -169,6 +171,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check endpoint - FAST and SIMPLE
 app.get('/api/health', (req, res) => {
@@ -205,9 +208,9 @@ app.get('/api/health', (req, res) => {
 
 // Simple test endpoint
 app.get('/api/test', (req, res) => {
-    res.json({ 
-        message: 'Server is working!', 
-        timestamp: new Date().toISOString() 
+    res.json({
+        message: 'Server is working!',
+        timestamp: new Date().toISOString()
     });
 });
 

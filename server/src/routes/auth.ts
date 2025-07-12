@@ -107,7 +107,7 @@ router.post('/register-test', (req: Request, res: Response) => {
 // Quick test login (bypass database for speed)
 router.post('/login-test', (req: Request, res: Response) => {
     const { email, password } = req.body;
-    
+
     // Simple test response
     const token = generateToken(1);
     const userData = {
@@ -122,7 +122,7 @@ router.post('/login-test', (req: Request, res: Response) => {
         availability: 'Available',
         role: 'user'
     };
-    
+
     res.json({
         success: true,
         message: 'Login successful',
@@ -132,6 +132,10 @@ router.post('/login-test', (req: Request, res: Response) => {
         }
     });
 });
+
+import { Worker } from 'worker_threads';
+
+// ... (imports)
 
 // Login
 router.post('/login', [
@@ -146,9 +150,8 @@ router.post('/login', [
     const { email, password } = req.body as LoginRequest;
 
     try {
-        // Use Promise to avoid callback hell
-        const user = await new Promise((resolve, reject) => {
-            db.get('SELECT * FROM users WHERE email = ?', [email], (err, user: any) => {
+        const user = await new Promise<any>((resolve, reject) => {
+            db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
                 if (err) reject(err);
                 else resolve(user);
             });
@@ -158,38 +161,81 @@ router.post('/login', [
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const isValidPassword = await bcrypt.compare(password, (user as any).password);
-        if (!isValidPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        const worker = new Worker(`
+            const bcrypt = require('bcryptjs');
+            const { parentPort, workerData } = require('worker_threads');
+            const { password, hash } = workerData;
+            const result = bcrypt.compareSync(password, hash);
+            parentPort.postMessage(result);
+        `, { eval: true });
 
-        const token = generateToken((user as any).id);
-        const nameParts = (user as any).name.split(' ');
-        const userData = {
-            id: (user as any).id,
-            email: (user as any).email,
-            name: (user as any).name,
-            firstName: nameParts[0] || '',
-            lastName: nameParts.slice(1).join(' ') || '',
-            location: (user as any).location,
-            profilePhoto: (user as any).profilePhoto,
-            isPublic: (user as any).isPublic,
-            availability: (user as any).availability,
-            role: (user as any).role
-        };
-        
-        res.json({
-            success: true,
-            message: 'Login successful',
-            data: {
-                token,
-                user: userData
+        worker.on('message', (isValidPassword) => {
+            if (!isValidPassword) {
+                return res.status(401).json({ error: 'Invalid credentials' });
             }
+
+            const token = generateToken((user as any).id);
+            const nameParts = (user as any).name.split(' ');
+            const userData = {
+                id: (user as any).id,
+                email: (user as any).email,
+                name: (user as any).name,
+                firstName: nameParts[0] || '',
+                lastName: nameParts.slice(1).join(' ') || '',
+                location: (user as any).location,
+                profilePhoto: (user as any).profilePhoto,
+                isPublic: (user as any).isPublic,
+                availability: (user as any).availability,
+                role: (user as any).role
+            };
+
+            res.json({
+                success: true,
+                message: 'Login successful',
+                data: {
+                    token,
+                    user: userData
+                }
+            });
         });
+
+        worker.on('error', (error) => {
+            console.error('Worker error:', error);
+            res.status(500).json({ error: 'Server error during login' });
+        });
+
+        worker.postMessage({ password, hash: user.password });
+
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Server error' });
     }
+});
+
+// Logout endpoint
+router.post('/logout', authenticateToken, (req: Request, res: Response) => {
+    // In a real app, you might blacklist the token
+    res.json({
+        success: true,
+        message: 'Logged out successfully'
+    });
+});
+
+// Refresh token endpoint
+router.post('/refresh', authenticateToken, (req: Request, res: Response) => {
+    const user = (req as AuthRequest).user;
+    if (!user) {
+        return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const newToken = generateToken(user.id);
+    res.json({
+        success: true,
+        message: 'Token refreshed successfully',
+        data: {
+            token: newToken
+        }
+    });
 });
 
 // Get current user profile
@@ -200,10 +246,13 @@ router.get('/me', authenticateToken, (req: Request, res: Response) => {
     }
 
     res.json({
-        user: {
+        success: true,
+        data: {
             id: user.id,
             email: user.email,
             name: user.name,
+            firstName: user.name?.split(' ')[0] || '',
+            lastName: user.name?.split(' ').slice(1).join(' ') || '',
             location: user.location,
             profilePhoto: user.profilePhoto,
             isPublic: user.isPublic,
@@ -270,7 +319,29 @@ router.put('/profile', authenticateToken, [
             return res.status(500).json({ error: 'Failed to update profile' });
         }
 
-        res.json({ message: 'Profile updated successfully' });
+        // Get updated user data
+        db.get('SELECT * FROM users WHERE id = ?', [user.id], (err, updatedUser: any) => {
+            if (err) {
+                return res.status(500).json({ error: 'Failed to fetch updated profile' });
+            }
+
+            res.json({
+                success: true,
+                message: 'Profile updated successfully',
+                data: {
+                    id: updatedUser.id,
+                    email: updatedUser.email,
+                    name: updatedUser.name,
+                    firstName: updatedUser.name?.split(' ')[0] || '',
+                    lastName: updatedUser.name?.split(' ').slice(1).join(' ') || '',
+                    location: updatedUser.location,
+                    profilePhoto: updatedUser.profilePhoto,
+                    isPublic: updatedUser.isPublic === 1,
+                    availability: updatedUser.availability,
+                    role: updatedUser.role
+                }
+            });
+        });
     });
 });
 

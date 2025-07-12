@@ -217,25 +217,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-    const register = async (userData: RegisterData): Promise<void> => {
+  const register = async (userData: RegisterData): Promise<void> => {
     try {
       setIsLoading(true);
       const response = await apiService.register(userData);
-      
+
       if (response.success) {
         const { token: newToken, user: newUser } = response.data;
-        
+
         // Update state immediately
         setToken(newToken);
         setUser(newUser);
-        
+
         // Store in localStorage
         localStorage.setItem('token', newToken);
         localStorage.setItem('user', JSON.stringify(newUser));
-        
+
         // Set token in API service
         apiService.setAuthToken(newToken);
-        
+
         toast.success(`Welcome to Skill Swap, ${newUser.firstName || newUser.name}!`);
       } else {
         throw new Error(response.message || 'Registration failed');
@@ -285,7 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(updatedUser));
         toast.success('Profile updated successfully');
       } else {
-        throw new Error(response.message || 'Profile update failed');
+        throw new Error('Profile update failed');
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'Profile update failed';
