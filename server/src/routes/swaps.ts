@@ -43,11 +43,11 @@ router.post('/', authenticateToken, [
             return res.status(400).json({ error: 'One or both skills not found' });
         }
 
-        if (skills.offeredUserId !== req.user?.id) {
+        if ((skills as any).offeredUserId !== req.user?.id) {
             return res.status(400).json({ error: 'Offered skill must belong to you' });
         }
 
-        if (skills.wantedUserId !== toUserId) {
+        if ((skills as any).wantedUserId !== toUserId) {
             return res.status(400).json({ error: 'Wanted skill must belong to the target user' });
         }
 
@@ -55,7 +55,7 @@ router.post('/', authenticateToken, [
         db.get(`
       SELECT id FROM swap_requests 
       WHERE fromUserId = ? AND toUserId = ? AND offeredSkillId = ? AND wantedSkillId = ? AND status = 'pending'
-    `, [req.user.id, toUserId, offeredSkillId, wantedSkillId], (err, existingSwap) => {
+    `, [req.user!.id, toUserId, offeredSkillId, wantedSkillId], (err, existingSwap) => {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
             }
@@ -68,7 +68,7 @@ router.post('/', authenticateToken, [
             db.run(`
         INSERT INTO swap_requests (fromUserId, toUserId, offeredSkillId, wantedSkillId, message)
         VALUES (?, ?, ?, ?, ?)
-      `, [req.user.id, toUserId, offeredSkillId, wantedSkillId, message], function (err) {
+      `, [req.user!.id, toUserId, offeredSkillId, wantedSkillId, message], function (err) {
                 if (err) {
                     return res.status(500).json({ error: 'Failed to create swap request' });
                 }
@@ -146,16 +146,16 @@ router.put('/:id/status', authenticateToken, [
 
         // Only the recipient can accept/reject, sender can cancel
         if (status === 'accepted' || status === 'rejected') {
-            if (swap.toUserId !== req.user?.id) {
+            if ((swap as any).toUserId !== req.user?.id) {
                 return res.status(403).json({ error: 'Only the recipient can accept or reject swap requests' });
             }
         } else if (status === 'cancelled') {
-            if (swap.fromUserId !== req.user?.id) {
+            if ((swap as any).fromUserId !== req.user?.id) {
                 return res.status(403).json({ error: 'Only the sender can cancel swap requests' });
             }
         }
 
-        if (swap.currentStatus !== 'pending') {
+        if ((swap as any).currentStatus !== 'pending') {
             return res.status(400).json({ error: 'Can only update pending swap requests' });
         }
 
@@ -192,11 +192,11 @@ router.delete('/:id', authenticateToken, (req: AuthRequest, res: Response) => {
             return res.status(404).json({ error: 'Swap request not found' });
         }
 
-        if (swap.fromUserId !== req.user?.id) {
+        if ((swap as any).fromUserId !== req.user?.id) {
             return res.status(403).json({ error: 'Only the sender can delete swap requests' });
         }
 
-        if (swap.status !== 'pending') {
+        if ((swap as any).status !== 'pending') {
             return res.status(400).json({ error: 'Can only delete pending swap requests' });
         }
 
@@ -239,16 +239,16 @@ router.post('/:id/rate', authenticateToken, [
             return res.status(404).json({ error: 'Swap request not found' });
         }
 
-        if (swap.status !== 'accepted') {
+        if ((swap as any).status !== 'accepted') {
             return res.status(400).json({ error: 'Can only rate accepted swaps' });
         }
 
-        if (swap.fromUserId !== req.user?.id && swap.toUserId !== req.user?.id) {
+        if ((swap as any).fromUserId !== req.user?.id && (swap as any).toUserId !== req.user?.id) {
             return res.status(403).json({ error: 'Not authorized to rate this swap' });
         }
 
         // Check if user already rated this swap
-        const toUserId = swap.fromUserId === req.user?.id ? swap.toUserId : swap.fromUserId;
+        const toUserId = (swap as any).fromUserId === req.user?.id ? (swap as any).toUserId : (swap as any).fromUserId;
 
         db.get(`
       SELECT id FROM ratings WHERE swapId = ? AND fromUserId = ?

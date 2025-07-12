@@ -23,8 +23,8 @@ router.get('/me', authenticateToken, (req: AuthRequest, res: Response) => {
 
         res.json({
             skills: {
-                offered: skills.filter(s => s.type === 'offered'),
-                wanted: skills.filter(s => s.type === 'wanted')
+                offered: skills.filter((s: any) => s.type === 'offered'),
+                wanted: skills.filter((s: any) => s.type === 'wanted')
             }
         });
     });

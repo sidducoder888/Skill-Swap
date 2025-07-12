@@ -64,7 +64,7 @@ router.get('/:id', authenticateToken, (req: AuthRequest, res: Response) => {
         }
 
         // Check if profile is private and user is not the owner
-        if (!user.isPublic && user.id !== req.user?.id) {
+        if (!(user as any).isPublic && (user as any).id !== req.user?.id) {
             return res.status(403).json({ error: 'Profile is private' });
         }
 
@@ -90,12 +90,12 @@ router.get('/:id', authenticateToken, (req: AuthRequest, res: Response) => {
                 res.json({
                     user: {
                         ...user,
-                        averageRating: ratings[0]?.averageRating || 0,
-                        totalRatings: ratings[0]?.totalRatings || 0
+                        averageRating: (ratings[0] as any)?.averageRating || 0,
+                        totalRatings: (ratings[0] as any)?.totalRatings || 0
                     },
                     skills: {
-                        offered: skills.filter(s => s.type === 'offered'),
-                        wanted: skills.filter(s => s.type === 'wanted')
+                        offered: skills.filter((s: any) => s.type === 'offered'),
+                        wanted: skills.filter((s: any) => s.type === 'wanted')
                     }
                 });
             });

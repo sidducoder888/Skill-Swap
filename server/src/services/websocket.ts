@@ -352,7 +352,7 @@ export class WebSocketService {
       this.io.to(`user:${data.toUserId}`).emit('message:receive', message);
       
       // Confirm to sender
-      socket.emit('message:sent', { tempId: data.id, message });
+      socket.emit('message:sent', { tempId: message.id, message });
 
       loggers.websocket.message(socket.userId!, 'message:send', data);
     });

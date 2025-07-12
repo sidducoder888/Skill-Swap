@@ -1,24 +1,25 @@
 import express from 'express';
 import { body, param, query, validationResult } from 'express-validator';
-import { auth } from '../middleware/auth';
+import { authenticateToken } from '../middleware/auth';
 import { db } from '../database/init';
+import { AuthRequest } from '../types';
 
 const router = express.Router();
 
 // Get user notifications with pagination
-router.get('/', auth, [
+router.get('/', authenticateToken, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('unread').optional().isBoolean().withMessage('Unread must be a boolean'),
-], async (req: any, res) => {
+], async (req: AuthRequest, res: express.Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
     const unreadOnly = req.query.unread === 'true';
 
@@ -27,8 +28,8 @@ router.get('/', auth, [
       FROM notifications 
       WHERE userId = ?
     `;
-    
-    const params = [req.user.id];
+
+    const params = [req.user!.id];
 
     if (unreadOnly) {
       query += ' AND read = 0';
@@ -44,11 +45,11 @@ router.get('/', auth, [
       }
 
       // Get total count
-      const countQuery = unreadOnly 
+      const countQuery = unreadOnly
         ? 'SELECT COUNT(*) as total FROM notifications WHERE userId = ? AND read = 0'
         : 'SELECT COUNT(*) as total FROM notifications WHERE userId = ?';
-      
-      const countParams = unreadOnly ? [req.user.id] : [req.user.id];
+
+      const countParams = unreadOnly ? [req.user!.id] : [req.user!.id];
 
       db.get(countQuery, countParams, (err, result: any) => {
         if (err) {
@@ -75,9 +76,9 @@ router.get('/', auth, [
 });
 
 // Mark notification as read
-router.put('/:id/read', auth, [
+router.put('/:id/read', authenticateToken, [
   param('id').isInt().withMessage('Notification ID must be an integer'),
-], async (req: any, res) => {
+], async (req: AuthRequest, res: express.Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -88,7 +89,7 @@ router.put('/:id/read', auth, [
 
     db.run(
       'UPDATE notifications SET read = 1 WHERE id = ? AND userId = ?',
-      [notificationId, req.user.id],
+      [notificationId, req.user!.id],
       function (err) {
         if (err) {
           return res.status(500).json({ error: 'Failed to mark notification as read' });
@@ -107,19 +108,19 @@ router.put('/:id/read', auth, [
 });
 
 // Mark all notifications as read
-router.put('/mark-all-read', auth, async (req: any, res) => {
+router.put('/mark-all-read', authenticateToken, async (req: AuthRequest, res: express.Response) => {
   try {
     db.run(
       'UPDATE notifications SET read = 1 WHERE userId = ? AND read = 0',
-      [req.user.id],
+      [req.user!.id],
       function (err) {
         if (err) {
           return res.status(500).json({ error: 'Failed to mark notifications as read' });
         }
 
-        res.json({ 
+        res.json({
           message: 'All notifications marked as read',
-          updated: this.changes 
+          updated: this.changes
         });
       }
     );
@@ -129,9 +130,9 @@ router.put('/mark-all-read', auth, async (req: any, res) => {
 });
 
 // Delete notification
-router.delete('/:id', auth, [
+router.delete('/:id', authenticateToken, [
   param('id').isInt().withMessage('Notification ID must be an integer'),
-], async (req: any, res) => {
+], async (req: AuthRequest, res: express.Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -142,7 +143,7 @@ router.delete('/:id', auth, [
 
     db.run(
       'DELETE FROM notifications WHERE id = ? AND userId = ?',
-      [notificationId, req.user.id],
+      [notificationId, req.user!.id],
       function (err) {
         if (err) {
           return res.status(500).json({ error: 'Failed to delete notification' });
@@ -161,7 +162,7 @@ router.delete('/:id', auth, [
 });
 
 // Get notification statistics
-router.get('/stats', auth, async (req: any, res) => {
+router.get('/stats', authenticateToken, async (req: AuthRequest, res: express.Response) => {
   try {
     const statsQuery = `
       SELECT 
@@ -172,7 +173,7 @@ router.get('/stats', auth, async (req: any, res) => {
       WHERE userId = ?
     `;
 
-    db.get(statsQuery, [req.user.id], (err, stats) => {
+    db.get(statsQuery, [req.user!.id], (err, stats) => {
       if (err) {
         return res.status(500).json({ error: 'Failed to get notification stats' });
       }

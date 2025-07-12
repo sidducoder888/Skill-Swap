@@ -142,29 +142,29 @@ router.get('/stats', (req: AuthRequest, res: Response) => {
         if (err) {
             return res.status(500).json({ error: 'Database error' });
         }
-        stats.totalUsers = userCount.totalUsers;
+        stats.totalUsers = (userCount as any).totalUsers;
 
         // Skill stats
         db.get('SELECT COUNT(*) as totalSkills FROM skills', (err, skillCount) => {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
             }
-            stats.totalSkills = skillCount.totalSkills;
+            stats.totalSkills = (skillCount as any).totalSkills;
 
             // Swap stats
             db.get('SELECT COUNT(*) as totalSwaps FROM swap_requests', (err, swapCount) => {
                 if (err) {
                     return res.status(500).json({ error: 'Database error' });
                 }
-                stats.totalSwaps = swapCount.totalSwaps;
+                stats.totalSwaps = (swapCount as any).totalSwaps;
 
                 // Rating stats
                 db.get('SELECT AVG(rating) as averageRating, COUNT(*) as totalRatings FROM ratings', (err, ratingStats) => {
                     if (err) {
                         return res.status(500).json({ error: 'Database error' });
                     }
-                    stats.averageRating = ratingStats.averageRating || 0;
-                    stats.totalRatings = ratingStats.totalRatings;
+                    stats.averageRating = (ratingStats as any).averageRating || 0;
+                    stats.totalRatings = (ratingStats as any).totalRatings;
 
                     // Status breakdown
                     db.all(`

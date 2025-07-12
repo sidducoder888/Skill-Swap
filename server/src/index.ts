@@ -20,13 +20,14 @@ import { adminRoutes } from './routes/admin';
 import { notificationRoutes } from './routes/notifications';
 import { messageRoutes } from './routes/messages';
 import { analyticsRoutes } from './routes/analytics';
+import { AuthRequest } from './types';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Security middleware - Enhanced helmet configuration
 app.use(helmet({
@@ -51,19 +52,16 @@ app.use(helmet({
 const createRateLimiter = (windowMs: number, max: number, message: string) => rateLimit({
     windowMs,
     max,
-    message: { 
-        error: 'Rate limit exceeded', 
+    message: {
+        error: 'Rate limit exceeded',
         message,
         retryAfter: Math.ceil(windowMs / 1000)
     },
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => {
+    skip: (req: AuthRequest) => {
         // Skip rate limiting for admin users
         return req.user?.role === 'admin';
-    },
-    onLimitReached: (req) => {
-        loggers.security.rateLimit(req.ip, req.path);
     },
 });
 
@@ -77,7 +75,7 @@ const uploadLimiter = createRateLimiter(15 * 60 * 1000, 10, 'Too many file uploa
 const speedLimiter = slowDown({
     windowMs: 15 * 60 * 1000,
     delayAfter: 50,
-    delayMs: 500,
+    delayMs: () => 500,
     maxDelayMs: 5000,
 });
 
@@ -123,42 +121,42 @@ app.use(cors({
 }));
 
 // Body parsing with size limits
-app.use(express.json({ 
+app.use(express.json({
     limit: process.env.MAX_JSON_SIZE || '10mb',
     strict: true,
     type: ['application/json', 'text/plain']
 }));
 
-app.use(express.urlencoded({ 
-    extended: true, 
+app.use(express.urlencoded({
+    extended: true,
     limit: process.env.MAX_URL_SIZE || '10mb',
     parameterLimit: 100
 }));
 
 // Request ID middleware for tracking
-app.use((req, res, next) => {
-    req.id = Math.random().toString(36).substr(2, 9);
-    res.setHeader('X-Request-ID', req.id);
+app.use((req: AuthRequest, res, next) => {
+    (req as any).id = Math.random().toString(36).substr(2, 9);
+    res.setHeader('X-Request-ID', (req as any).id);
     next();
 });
 
 // Performance monitoring middleware
-app.use((req, res, next) => {
+app.use((req: AuthRequest, res, next) => {
     const start = Date.now();
-    
+
     res.on('finish', () => {
         const duration = Date.now() - start;
-        
+
         // Log slow requests
         if (duration > 1000) {
             loggers.performance.slow(`${req.method} ${req.path}`, duration, 1000);
         }
-        
+
         // Track API metrics
         redisService.incrementCounter(`api:${req.method}:${req.path}:count`);
         redisService.incrementCounter(`api:${req.method}:${req.path}:duration`, duration);
     });
-    
+
     next();
 });
 
@@ -177,16 +175,16 @@ app.get('/api/health', async (req, res) => {
     try {
         // Database health check
         const dbHealth = await checkDatabaseHealth();
-        
+
         // Redis health check
         const redisStats = await redisService.getStats();
-        
+
         // Memory usage
         const memoryUsage = process.memoryUsage();
-        
+
         // System uptime
         const uptime = process.uptime();
-        
+
         const healthData = {
             status: 'OK',
             message: 'Skill Swap Platform API is running',
@@ -198,27 +196,26 @@ app.get('/api/health', async (req, res) => {
             redis: redisStats,
             memory: {
                 rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
-                heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
                 heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+                heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
                 external: `${Math.round(memoryUsage.external / 1024 / 1024)}MB`,
             },
-            features: {
-                websocket: true,
-                redis: redisStats.connected,
-                compression: true,
-                rateLimit: true,
-                security: true,
-                logging: true,
-                monitoring: true,
+            system: {
+                platform: process.platform,
+                nodeVersion: process.version,
+                pid: process.pid,
+                uptime: process.uptime(),
             }
         };
-        
-        res.json(healthData);
+
+        res.status(200).json(healthData);
     } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         res.status(500).json({
             status: 'ERROR',
             message: 'Health check failed',
-            error: error.message,
+            error: errorMessage,
+            timestamp: new Date().toISOString()
         });
     }
 });
@@ -248,12 +245,12 @@ app.get('/api/websocket/stats', (req, res) => {
 app.use(errorLogger);
 
 // Global error handler with detailed logging
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: AuthRequest, res: express.Response, next: express.NextFunction) => {
     const errorId = Math.random().toString(36).substr(2, 9);
-    
+
     // Log error with context
     loggers.api.error(req.method, req.url, err, req.user?.id);
-    
+
     // Log additional context
     logger.error('Unhandled error', {
         errorId,
@@ -341,7 +338,8 @@ async function checkDatabaseHealth(): Promise<any> {
             });
         });
     } catch (error) {
-        return { status: 'error', message: error.message };
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return { status: 'error', message: errorMessage };
     }
 }
 
@@ -363,14 +361,15 @@ async function getSystemStats(): Promise<any> {
             timestamp: new Date().toISOString(),
         };
     } catch (error) {
-        throw new Error(`Failed to get system stats: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Failed to get system stats: ${errorMessage}`);
     }
 }
 
 // Graceful shutdown handling
 const gracefulShutdown = async (signal: string) => {
     loggers.system.shutdown(`Server (${signal})`);
-    
+
     server.close(async () => {
         try {
             await redisService.disconnect();
@@ -380,7 +379,7 @@ const gracefulShutdown = async (signal: string) => {
             process.exit(1);
         }
     });
-    
+
     // Force shutdown after 10 seconds
     setTimeout(() => {
         logger.error('Forced shutdown after timeout');
@@ -410,8 +409,16 @@ const startServer = async () => {
         await createTables(require('./database/init').db);
         loggers.database.connected('SQLite');
 
-        // Initialize Redis
-        await redisService.connect();
+        // Initialize Redis (optional for development)
+        if (process.env.DISABLE_REDIS !== 'true') {
+            try {
+                await redisService.connect();
+            } catch (error) {
+                logger.warn('⚠️ Redis connection failed, continuing without Redis cache');
+            }
+        } else {
+            logger.info('ℹ️ Redis disabled via DISABLE_REDIS environment variable');
+        }
 
         // Initialize WebSocket
         const websocketService = initializeWebSocket(server);

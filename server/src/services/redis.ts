@@ -16,10 +16,10 @@ export class RedisService {
       url: process.env.REDIS_URL || 'redis://localhost:6379',
       socket: {
         reconnectStrategy: (retries: number) => {
-          if (retries > 10) {
-            return new Error('Too many Redis reconnection attempts');
+          if (retries > 3) {
+            return false; // Stop retrying after 3 attempts
           }
-          return Math.min(retries * 100, 3000);
+          return Math.min(retries * 100, 1000);
         },
       },
     });
@@ -50,8 +50,9 @@ export class RedisService {
       await this.client.connect();
       logger.info('✅ Redis connected successfully');
     } catch (error) {
-      logger.error('❌ Redis connection failed:', error);
-      // Continue without Redis for development
+      logger.warn('⚠️ Redis connection failed, continuing without Redis cache');
+      this.isConnected = false;
+      // Don't throw error, just log and continue
     }
   }
 
