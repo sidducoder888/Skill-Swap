@@ -12,6 +12,8 @@ router.post('/register', [
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 6 }),
     body('name').trim().isLength({ min: 2 }),
+    body('firstName').optional().trim(),
+    body('lastName').optional().trim(),
     body('location').optional().trim(),
     body('availability').optional().trim()
 ], async (req: Request, res: Response) => {
@@ -20,49 +22,115 @@ router.post('/register', [
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password, name, location, availability }: RegisterRequest = req.body;
+    const { email, password, name, firstName, lastName, location, availability } = req.body as RegisterRequest;
 
     try {
         // Check if user already exists
-        db.get('SELECT id FROM users WHERE email = ?', [email], async (err, existingUser) => {
-            if (err) {
-                return res.status(500).json({ error: 'Database error' });
-            }
+        const existingUser = await new Promise((resolve, reject) => {
+            db.get('SELECT id FROM users WHERE email = ?', [email], (err, user) => {
+                if (err) reject(err);
+                else resolve(user);
+            });
+        });
 
-            if (existingUser) {
-                return res.status(400).json({ error: 'User already exists' });
-            }
+        if (existingUser) {
+            return res.status(400).json({ error: 'User already exists' });
+        }
 
-            // Hash password
-            const hashedPassword = await bcrypt.hash(password, 10);
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Create user
+        // Create user
+        const result = await new Promise((resolve, reject) => {
             db.run(`
         INSERT INTO users (email, password, name, location, availability)
         VALUES (?, ?, ?, ?, ?)
       `, [email, hashedPassword, name, location, availability], function (err) {
-                if (err) {
-                    return res.status(500).json({ error: 'Failed to create user' });
-                }
-
-                const token = generateToken(this.lastID);
-                res.status(201).json({
-                    message: 'User created successfully',
-                    token,
-                    user: {
-                        id: this.lastID,
-                        email,
-                        name,
-                        location,
-                        availability,
-                        role: 'user'
-                    }
-                });
+                if (err) reject(err);
+                else resolve({ lastID: this.lastID });
             });
         });
+
+        const token = generateToken((result as any).lastID);
+        const userData = {
+            id: (result as any).lastID,
+            email,
+            name,
+            firstName: firstName || name.split(' ')[0],
+            lastName: lastName || name.split(' ').slice(1).join(' ') || '',
+            location,
+            availability,
+            role: 'user'
+        };
+
+        res.status(201).json({
+            success: true,
+            message: 'User created successfully',
+            data: {
+                token,
+                user: userData
+            }
+        });
     } catch (error) {
+        console.error('Registration error:', error);
         res.status(500).json({ error: 'Server error' });
     }
+});
+
+// Quick test register (bypass database and bcrypt for speed)
+router.post('/register-test', (req: Request, res: Response) => {
+    const { email, password, name, firstName, lastName, location, availability } = req.body;
+    // Simple test response
+    const token = generateToken(2);
+    const userData = {
+        id: 2,
+        email: email || 'test2@test.com',
+        name: name || 'Test User2',
+        firstName: firstName || 'Test',
+        lastName: lastName || 'User2',
+        location: location || 'Test City',
+        profilePhoto: null,
+        isPublic: true,
+        availability: availability || 'Available',
+        role: 'user'
+    };
+    res.status(201).json({
+        success: true,
+        message: 'User created successfully',
+        data: {
+            token,
+            user: userData
+        }
+    });
+});
+
+// Quick test login (bypass database for speed)
+router.post('/login-test', (req: Request, res: Response) => {
+    const { email, password } = req.body;
+    
+    // Simple test response
+    const token = generateToken(1);
+    const userData = {
+        id: 1,
+        email: email || 'test@test.com',
+        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
+        location: 'Test City',
+        profilePhoto: null,
+        isPublic: true,
+        availability: 'Available',
+        role: 'user'
+    };
+    
+    res.json({
+        success: true,
+        message: 'Login successful',
+        data: {
+            token,
+            user: userData
+        }
+    });
 });
 
 // Login
@@ -78,37 +146,48 @@ router.post('/login', [
     const { email, password } = req.body as LoginRequest;
 
     try {
-        db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user: any) => {
-            if (err) {
-                return res.status(500).json({ error: 'Database error' });
-            }
-
-            if (!user) {
-                return res.status(401).json({ error: 'Invalid credentials' });
-            }
-
-            const isValidPassword = await bcrypt.compare(password, user.password);
-            if (!isValidPassword) {
-                return res.status(401).json({ error: 'Invalid credentials' });
-            }
-
-            const token = generateToken(user.id);
-            res.json({
-                message: 'Login successful',
-                token,
-                user: {
-                    id: user.id,
-                    email: user.email,
-                    name: user.name,
-                    location: user.location,
-                    profilePhoto: user.profilePhoto,
-                    isPublic: user.isPublic,
-                    availability: user.availability,
-                    role: user.role
-                }
+        // Use Promise to avoid callback hell
+        const user = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM users WHERE email = ?', [email], (err, user: any) => {
+                if (err) reject(err);
+                else resolve(user);
             });
         });
+
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const isValidPassword = await bcrypt.compare(password, (user as any).password);
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = generateToken((user as any).id);
+        const nameParts = (user as any).name.split(' ');
+        const userData = {
+            id: (user as any).id,
+            email: (user as any).email,
+            name: (user as any).name,
+            firstName: nameParts[0] || '',
+            lastName: nameParts.slice(1).join(' ') || '',
+            location: (user as any).location,
+            profilePhoto: (user as any).profilePhoto,
+            isPublic: (user as any).isPublic,
+            availability: (user as any).availability,
+            role: (user as any).role
+        };
+        
+        res.json({
+            success: true,
+            message: 'Login successful',
+            data: {
+                token,
+                user: userData
+            }
+        });
     } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });

@@ -76,6 +76,7 @@ export class WebSocketService {
       },
       pingTimeout: 60000,
       pingInterval: 25000,
+      transports: ['websocket', 'polling'],
     });
 
     this.setupMiddleware();

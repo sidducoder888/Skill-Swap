@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, TextField, Typography, Paper } from '@mui/material';
+import { Box, Button, TextField, Typography, Paper, CircularProgress } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Login = () => {
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,11 +13,18 @@ export const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!email || !password) {
+      setError('Email and password are required');
+      return;
+    }
+
     try {
       await login(email, password);
       navigate('/dashboard');
-    } catch (err) {
-      setError('Invalid credentials');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Invalid credentials');
     }
   };
 
@@ -29,7 +36,16 @@ export const Login = () => {
           <TextField label="Email" fullWidth margin="normal" value={email} onChange={e => setEmail(e.target.value)} />
           <TextField label="Password" type="password" fullWidth margin="normal" value={password} onChange={e => setPassword(e.target.value)} />
           {error && <Typography color="error">{error}</Typography>}
-          <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>Login</Button>
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            sx={{ mt: 2 }}
+            disabled={isLoading}
+            startIcon={isLoading ? <CircularProgress size={20} /> : null}
+          >
+            {isLoading ? 'Logging in...' : 'Login'}
+          </Button>
         </form>
       </Paper>
     </Box>

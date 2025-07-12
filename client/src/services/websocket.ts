@@ -48,8 +48,7 @@ export class WebSocketService {
         auth: {
           token,
         },
-        transports: ['websocket'],
-        upgrade: false,
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,

@@ -5,6 +5,8 @@ export interface User {
   email: string;
   password: string; // Added for authentication
   name: string;
+  firstName?: string;
+  lastName?: string;
   location?: string;
   profilePhoto?: string;
   isPublic: boolean;
@@ -60,6 +62,8 @@ export interface RegisterRequest {
   email: string;
   password: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   location?: string;
   availability?: string;
 }

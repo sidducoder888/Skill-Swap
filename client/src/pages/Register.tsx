@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, TextField, Typography, Paper } from '@mui/material';
+import { Box, Button, TextField, Typography, Paper, CircularProgress } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Register = () => {
-  const { register } = useAuth();
+  const { register, isLoading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,17 +15,25 @@ export const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!email || !password || !firstName || !lastName) {
+      setError('All fields are required');
+      return;
+    }
+
     try {
-      await register({ 
-        email, 
-        password, 
-        firstName, 
-        lastName, 
-        name: `${firstName} ${lastName}` 
+      await register({
+        email,
+        password,
+        firstName,
+        lastName,
+        name: `${firstName} ${lastName}`
       });
+      // Navigate immediately after successful registration
       navigate('/dashboard');
-    } catch (err) {
-      setError('Registration failed');
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Registration failed');
     }
   };
 
@@ -39,7 +47,16 @@ export const Register = () => {
           <TextField label="Email" fullWidth margin="normal" value={email} onChange={e => setEmail(e.target.value)} />
           <TextField label="Password" type="password" fullWidth margin="normal" value={password} onChange={e => setPassword(e.target.value)} />
           {error && <Typography color="error">{error}</Typography>}
-          <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>Register</Button>
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            sx={{ mt: 2 }}
+            disabled={isLoading}
+            startIcon={isLoading ? <CircularProgress size={20} /> : null}
+          >
+            {isLoading ? 'Registering...' : 'Register'}
+          </Button>
         </form>
       </Paper>
     </Box>

@@ -73,10 +73,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // WebSocket connection management
+  // WebSocket connection management - DELAYED to avoid blocking auth
   useEffect(() => {
-    if (isAuthenticated && token) {
-      connectWebSocket();
+    if (isAuthenticated && token && user) {
+      // Delay WebSocket connection to avoid blocking auth
+      setTimeout(() => {
+        connectWebSocket();
+      }, 1000);
     } else {
       disconnectWebSocket();
     }
@@ -84,7 +87,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       disconnectWebSocket();
     };
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, user]);
 
   // Online/offline detection
   useEffect(() => {
@@ -119,7 +122,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (savedToken && savedUser) {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
-        
+
         // Verify token is still valid
         try {
           const response = await apiService.getProfile();
@@ -186,21 +189,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       const response = await apiService.login({ email, password });
-      
+
       if (response.success) {
         const { token: newToken, user: userData } = response.data;
-        
+
+        // Update state immediately
         setToken(newToken);
         setUser(userData);
-        
+
         // Store in localStorage
         localStorage.setItem('token', newToken);
         localStorage.setItem('user', JSON.stringify(userData));
-        
+
         // Set token in API service
         apiService.setAuthToken(newToken);
-        
-        toast.success(`Welcome back, ${userData.firstName}!`);
+
+        toast.success(`Welcome back, ${userData.firstName || userData.name}!`);
       } else {
         throw new Error(response.message || 'Login failed');
       }
@@ -213,7 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (userData: RegisterData): Promise<void> => {
+    const register = async (userData: RegisterData): Promise<void> => {
     try {
       setIsLoading(true);
       const response = await apiService.register(userData);
@@ -221,6 +225,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success) {
         const { token: newToken, user: newUser } = response.data;
         
+        // Update state immediately
         setToken(newToken);
         setUser(newUser);
         
@@ -231,7 +236,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Set token in API service
         apiService.setAuthToken(newToken);
         
-        toast.success(`Welcome to Skill Swap, ${newUser.firstName}!`);
+        toast.success(`Welcome to Skill Swap, ${newUser.firstName || newUser.name}!`);
       } else {
         throw new Error(response.message || 'Registration failed');
       }
@@ -247,18 +252,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       setIsLoading(true);
-      
+
       // Update user status to offline
       if (connectionStatus === 'connected') {
         webSocketService.updateUserStatus('offline');
       }
-      
+
       // Call logout endpoint
       await apiService.logout();
-      
+
       // Clear auth state
       clearAuthState();
-      
+
       toast.success('Logged out successfully');
     } catch (error) {
       // Even if logout fails, clear local state
@@ -273,7 +278,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       const response = await apiService.updateProfile(userData);
-      
+
       if (response.success) {
         const updatedUser = response.data;
         setUser(updatedUser);
@@ -294,13 +299,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshToken = async (): Promise<void> => {
     try {
       const response = await apiService.refreshToken();
-      
+
       if (response.success) {
         const { token: newToken } = response.data;
         setToken(newToken);
         localStorage.setItem('token', newToken);
         apiService.setAuthToken(newToken);
-        
+
         // Reconnect WebSocket with new token
         if (isAuthenticated) {
           connectWebSocket();

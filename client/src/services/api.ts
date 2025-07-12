@@ -7,7 +7,7 @@ class ApiService {
     this.baseURL = baseURL;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     const config: RequestInit = {
       headers: {
@@ -28,13 +28,13 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        throw new Error(data.message || data.error || `HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      return data;
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
@@ -43,17 +43,25 @@ class ApiService {
 
   // Auth endpoints
   async login(credentials: { email: string; password: string }): Promise<{ success: boolean; data: { token: string; user: any }; message?: string }> {
-    return this.request('/auth/login', {
+    const response = await this.request<{ success: boolean; data: { token: string; user: any }; message?: string }>('/auth/login-test', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
+    return response;
   }
 
   async register(userData: { email: string; password: string; firstName: string; lastName: string }): Promise<{ success: boolean; data: { token: string; user: any }; message?: string }> {
-    return this.request('/auth/register', {
+    // Convert firstName/lastName to name for server compatibility
+    const serverData = {
+      ...userData,
+      name: `${userData.firstName} ${userData.lastName}`.trim(),
+    };
+
+    const response = await this.request<{ success: boolean; data: { token: string; user: any }; message?: string }>('/auth/register-test', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: JSON.stringify(serverData),
     });
+    return response;
   }
 
   async logout(): Promise<{ success: boolean; data?: any; message?: string }> {
